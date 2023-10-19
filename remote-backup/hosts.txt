@@ -1,0 +1,2 @@
+user1@host1 /path/to/dir1
+user2@host2 /path/to/dir2
