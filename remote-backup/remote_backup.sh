@@ -46,6 +46,14 @@ log_error() {
     echo "$(date) [ERROR]: $1" | tee -a "$LOG_FILE"
 }
 
+log_success() {
+    echo "$(date) [SUCCESS]: $1" | tee -a "$LOG_FILE"
+}
+
+log_info() {
+    echo "$(date) [INFO]: $1" | tee -a "$LOG_FILE"
+}
+
 validate_files() {
     local files=("$HOSTS_FILE" "$EXCLUDE_FILE" "$SSH_KEY" "$PASSPHRASE_FILE")
     for file in "${files[@]}"; do
@@ -66,6 +74,8 @@ backup_host() {
     if [[ $? -ne 0 ]]; then
         log_error "SSH failed for $ssh_conn"
         return 1
+    else
+        log_info "Connected via SSH to $hostname"
     fi
 
     local backup_file="${host_name}_${TIMESTAMP}.tar.gz.gpg"
@@ -73,28 +83,38 @@ backup_host() {
     if ! mkdir -p "${BACKUP_DIR}/${host_name}"; then
         log_error "Failed to create backup directory ${BACKUP_DIR}/${host_name}"
         return 1
+    else
+        log_info "Created backup directory"
     fi
 
     if ! rsync --timeout=10 -av --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "${BACKUP_DIR}/${host_name}/"; then
         log_error "rsync failed for $ssh_conn:$src_dir"
         return 1
+    else
+        log_info "Finished rsync backup for $host_name"
     fi
 
     if ! tar -czf - "${BACKUP_DIR}/${host_name}/" | gpg --batch --symmetric --passphrase "$PASSPHRASE" -o "${BACKUP_DIR}/${backup_file}"; then
         log_error "tar or gpg failed for $ssh_conn:$src_dir"
         return 1
+    else
+        log_info "Completed compression and encryption"
     fi
 
     if ! rm -rf "${BACKUP_DIR}/${host_name}/"; then
         log_error "Failed to delete temporary backup directory ${BACKUP_DIR}/${host_name}/"
+    else
+        log_info "Deleted temporary backup directory"
     fi
 
-    echo "Backup of $ssh_conn:$src_dir completed and saved as ${BACKUP_DIR}/${backup_file}"
+    log_success "Backup of $ssh_conn:$src_dir completed and saved as ${BACKUP_DIR}/${backup_file}"
 }
 
 # Validate that all files exist and are readable
 if ! validate_files; then
     exit 1
+else
+    log_info "Validated necessary files"
 fi
 
 # Read passphrase from file
@@ -102,16 +122,18 @@ PASSPHRASE=$(cat "$PASSPHRASE_FILE")
 if [[ $? -ne 0 ]]; then
     log_error "Failed to read passphrase from $PASSPHRASE_FILE"
     exit 1
+else
+    log_info "Read passphrase from file"
 fi
 
 # Loop through hosts in hosts.txt file
 while read -r ssh_conn src_dir; do
-    echo "Starting backup of $ssh_conn:$src_dir..."
+    log_info "Starting backup of $ssh_conn:$src_dir..."
     if backup_host "$ssh_conn" "$src_dir"; then
-        echo "Backup of $ssh_conn:$src_dir completed successfully."
+        log_success "Backup of $ssh_conn:$src_dir completed successfully."
     else
         log_error "Backup failed for $ssh_conn:$src_dir"
-        echo "Continuing with the next host..."
+        log_info "Continuing with the next host..."
     fi
 done < "$HOSTS_FILE"
 
