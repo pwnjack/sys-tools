@@ -1,7 +1,8 @@
 #!/bin/bash
 
+# Function to display usage information
 usage() {
-    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -l <log_file>"
+    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -l <log_file> [-s]"
     echo
     echo "Options:"
     echo "-h <hosts_file>        Path to the file containing the list of hosts to backup."
@@ -10,6 +11,7 @@ usage() {
     echo "-e <exclude_file>      Path to the file containing the list of files to exclude from the backup."
     echo "-b <backup_dir>        Path to the directory where the backups should be stored."
     echo "-l <log_file>          Path to the file where logs should be written."
+    echo "-s                     Silent mode. Suppresses all output."
     echo
     exit 1
 }
@@ -21,6 +23,7 @@ SSH_KEY="$HOME/.ssh/ssh_key"
 EXCLUDE_FILE="exclude.txt"
 BACKUP_DIR="backups"
 LOG_FILE="backup.log"
+SILENT_MODE=0
 
 # Check if at least one option is provided
 if [ $# -eq 0 ]; then
@@ -28,116 +31,115 @@ if [ $# -eq 0 ]; then
 fi
 
 # Parse options
-while getopts "h:p:k:e:b:l:" opt; do
+while getopts "h:p:k:e:b:l:s" opt; do
     case ${opt} in
-        h) HOSTS_FILE=$OPTARG ;;
-        p) PASSPHRASE_FILE=$OPTARG ;;
-        k) SSH_KEY=$OPTARG ;;
-        e) EXCLUDE_FILE=$OPTARG ;;
-        b) BACKUP_DIR=$OPTARG ;;
-        l) LOG_FILE=$OPTARG ;;
+        h) HOSTS_FILE=${OPTARG} ;;
+        p) PASSPHRASE_FILE=${OPTARG} ;;
+        k) SSH_KEY=${OPTARG} ;;
+        e) EXCLUDE_FILE=${OPTARG} ;;
+        b) BACKUP_DIR=${OPTARG} ;;
+        l) LOG_FILE=${OPTARG} ;;
+        s) SILENT_MODE=1 ;;
         *) usage ;;
     esac
 done
 
-readonly TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
-
-log_error() {
-    echo "$(date) [ERROR]: $1" | tee -a "$LOG_FILE"
+# Function to log messages
+log_message() {
+    local message_type=$1
+    local message=$2
+    local timestamp=$(date)
+    if [ ${SILENT_MODE} -eq 0 ]; then
+        echo "${timestamp} [${message_type}]: ${message}" | tee -a "${LOG_FILE}"
+    else
+        echo "${timestamp} [${message_type}]: ${message}" >> "${LOG_FILE}"
+    fi
 }
 
-log_success() {
-    echo "$(date) [SUCCESS]: $1" | tee -a "$LOG_FILE"
+# Function to validate file permissions
+validate_permissions() {
+    local file=$1
+    local permissions
+    permissions=$(stat -c "%a" "${file}")
+    if [ "${permissions}" -gt "600" ]; then
+        log_message "ERROR" "Permissions for ${file} are too open. It is recommended to use 'chmod 600 ${file}' to set proper permissions."
+        exit 1
+    fi
 }
 
-log_info() {
-    echo "$(date) [INFO]: $1" | tee -a "$LOG_FILE"
-}
-
+# Function to validate that all files exist and are readable
 validate_files() {
-    local files=("$HOSTS_FILE" "$EXCLUDE_FILE" "$SSH_KEY" "$PASSPHRASE_FILE")
+    local files=("${HOSTS_FILE}" "${EXCLUDE_FILE}" "${SSH_KEY}" "${PASSPHRASE_FILE}")
     for file in "${files[@]}"; do
-        if [[ ! -r "$file" ]]; then
-            log_error "Error: '$file' does not exist or is not readable."
+        if [[ ! -r "${file}" ]]; then
+            log_message "ERROR" "Error: '${file}' does not exist or is not readable."
             return 1
         fi
+        validate_permissions "${file}"
     done
 }
 
+# Function to backup a single host
 backup_host() {
     local ssh_conn=$1
     local src_dir=$2
     local host_name
-    host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" hostname 2>/dev/null)
+    host_name=$(ssh -i "${SSH_KEY}" -o ConnectTimeout=10 -n "${ssh_conn}" hostname 2>/dev/null)
 
     # Check if ssh command was successful
     if [[ $? -ne 0 ]]; then
-        log_error "SSH failed for $ssh_conn"
+        log_message "ERROR" "SSH failed for ${ssh_conn}"
         return 1
     else
-        log_info "Connected via SSH to $hostname"
+        log_message "INFO" "Connected via SSH to ${host_name}"
     fi
 
-    local backup_file="${host_name}_${TIMESTAMP}.tar.gz.gpg"
+    local backup_file="${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
 
     if ! mkdir -p "${BACKUP_DIR}/${host_name}"; then
-        log_error "Failed to create backup directory ${BACKUP_DIR}/${host_name}"
+        log_message "ERROR" "Failed to create backup directory ${BACKUP_DIR}/${host_name}"
         return 1
     else
-        log_info "Created backup directory"
+        log_message "INFO" "Created backup directory"
     fi
 
-    if ! rsync --timeout=10 -av --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "${BACKUP_DIR}/${host_name}/"; then
-        log_error "rsync failed for $ssh_conn:$src_dir"
+    if ! rsync --timeout=10 -av --delete --exclude-from="${EXCLUDE_FILE}" -e "ssh -i ${SSH_KEY}" "${ssh_conn}:${src_dir}" "${BACKUP_DIR}/${host_name}/"; then
+        log_message "ERROR" "rsync failed for ${ssh_conn}:${src_dir}"
         return 1
     else
-        log_info "Finished rsync backup for $host_name"
+        log_message "INFO" "rsync completed for ${ssh_conn}:${src_dir}"
     fi
 
-    if ! tar -czf - "${BACKUP_DIR}/${host_name}/" | gpg --batch --symmetric --passphrase "$PASSPHRASE" -o "${BACKUP_DIR}/${backup_file}"; then
-        log_error "tar or gpg failed for $ssh_conn:$src_dir"
+    local passphrase
+    passphrase=$(<"${PASSPHRASE_FILE}")
+
+    # Ensure the backup directory is cleaned up on script exit or error
+    trap 'rm -rf "${BACKUP_DIR:?}/${host_name}"' EXIT
+
+    if ! tar -czf - "${BACKUP_DIR}/${host_name}/" | gpg --batch --symmetric --passphrase "${passphrase}" -o "${BACKUP_DIR}/${backup_file}"; then
+        log_message "ERROR" "Backup encryption failed for ${host_name}"
         return 1
     else
-        log_info "Completed compression and encryption"
+        log_message "INFO" "Backup encryption completed for ${host_name}"
     fi
 
-    if ! rm -rf "${BACKUP_DIR}/${host_name}/"; then
-        log_error "Failed to delete temporary backup directory ${BACKUP_DIR}/${host_name}/"
-    else
-        log_info "Deleted temporary backup directory"
-    fi
-
-    log_success "Backup of $ssh_conn:$src_dir completed and saved as ${BACKUP_DIR}/${backup_file}"
+    # Clean up the unencrypted backup directory
+    rm -rf "${BACKUP_DIR}/${host_name}"
+    log_message "INFO" "Cleaned up backup directory for ${host_name}"
 }
 
-# Validate that all files exist and are readable
-if ! validate_files; then
+# Validate that all required files exist and are readable
+validate_files || exit 1
+
+# Read hosts file and start the backup process
+while IFS= read -r line || [[ -n "$line" ]]; do
+    backup_host ${line}
+done < "${HOSTS_FILE}"
+
+# Check if the read command succeeded
+if [ $? -ne 0 ]; then
+    log_message "ERROR" "Failed to read from ${HOSTS_FILE}"
     exit 1
-else
-    log_info "Validated necessary files"
 fi
 
-# Read passphrase from file
-PASSPHRASE=$(cat "$PASSPHRASE_FILE")
-if [[ $? -ne 0 ]]; then
-    log_error "Failed to read passphrase from $PASSPHRASE_FILE"
-    exit 1
-else
-    log_info "Read passphrase from file"
-fi
-
-# Loop through hosts in hosts.txt file
-while read -r ssh_conn src_dir; do
-    log_info "Starting backup of $ssh_conn:$src_dir..."
-    if backup_host "$ssh_conn" "$src_dir"; then
-        log_success "Backup of $ssh_conn:$src_dir completed successfully."
-    else
-        log_error "Backup failed for $ssh_conn:$src_dir"
-        log_info "Continuing with the next host..."
-    fi
-done < "$HOSTS_FILE"
-
-# Restore instructions
-echo ""
-echo "To restore a backup, copy the encrypted backup file to the remote host and run the following command:"
-echo "gpg --batch --decrypt --passphrase \"\$(cat passphrase.txt)\" <backup_file> | tar -xzf - -C /path/to/restore"
+log_message "INFO" "Backup script completed"
