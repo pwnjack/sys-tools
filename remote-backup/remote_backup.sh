@@ -19,19 +19,14 @@ usage() {
 # Set default variables
 HOSTS_FILE="hosts.txt"
 PASSPHRASE_FILE="passphrase.txt"
-SSH_KEY="$HOME/.ssh/ssh_key"
+SSH_KEY="$HOME/.ssh/id_rsa"
 EXCLUDE_FILE="exclude.txt"
 BACKUP_DIR="backups"
 LOG_FILE="backup.log"
 SILENT_MODE=0
 
-# Check if at least one option is provided
-if [ $# -eq 0 ]; then
-    usage
-fi
-
 # Parse options
-while getopts "h:p:k:e:b:l:s" opt; do
+while getopts ":h:p:k:e:b:l:s" opt; do
     case $opt in
         h) HOSTS_FILE="$OPTARG" ;;
         p) PASSPHRASE_FILE="$OPTARG" ;;
@@ -44,16 +39,20 @@ while getopts "h:p:k:e:b:l:s" opt; do
     esac
 done
 
+# Redirect output to log file if not in silent mode
+if [ $SILENT_MODE -eq 0 ]; then
+    exec 3>&1 4>&2
+    trap 'exec 2>&4 1>&3' 0 1 2 3
+    exec 1>>"$LOG_FILE" 2>&1
+else
+    exec 1>/dev/null 2>&1
+fi
+
 # Function to log messages
 log_message() {
     local message_type=$1
     local message=$2
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    if [ $SILENT_MODE -eq 0 ]; then
-        echo "$timestamp [$message_type]: $message" | tee -a "$LOG_FILE"
-    else
-        echo "$timestamp [$message_type]: $message" >> "$LOG_FILE"
-    fi
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message"
 }
 
 # Function to validate file permissions
@@ -89,49 +88,33 @@ backup_host() {
     if [[ $? -ne 0 ]]; then
         log_message "ERROR" "SSH failed for $ssh_conn"
         return 1
-    else
-        log_message "INFO" "Connected via SSH to $host_name"
     fi
 
-    local backup_file="${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
-
-    if ! mkdir -p "$BACKUP_DIR/$host_name"; then
-        log_message "ERROR" "Failed to create backup directory $BACKUP_DIR/$host_name"
-        return 1
-    fi
-
-    if ! rsync --timeout=10 -av --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "$BACKUP_DIR/$host_name/"; then
-        log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
-        return 1
-    else
-        log_message "INFO" "rsync completed for $ssh_conn:$src_dir"
-    fi
-
+    local backup_file="${BACKUP_DIR}/${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
     local passphrase
     passphrase=$(<"$PASSPHRASE_FILE")
 
-    # Ensure the backup directory is cleaned up on script exit or error
-    trap 'rm -rf "$BACKUP_DIR/$host_name"' EXIT
-
-    if ! tar -czf - "$BACKUP_DIR/$host_name/" | gpg --batch --symmetric --passphrase "$passphrase" -o "$BACKUP_DIR/$backup_file"; then
-        log_message "ERROR" "Backup encryption failed for $host_name"
+    if ! rsync --timeout=10 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "/tmp/${host_name}/"; then
+        log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
         return 1
-    else
-        log_message "INFO" "Backup encryption completed for $host_name"
     fi
 
-    # Clean up the unencrypted backup directory
-    rm -rf "$BACKUP_DIR/$host_name"
-    log_message "INFO" "Cleaned up backup directory for $host_name"
+    if ! tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
+        log_message "ERROR" "Backup encryption failed for $host_name"
+        return 1
+    fi
+
+    rm -rf "/tmp/${host_name}"
+    log_message "INFO" "Backup and cleanup completed for $host_name"
 }
 
-# Set a trap to clean up in case of premature exit
-trap 'rm -rf "$BACKUP_DIR/"*' EXIT
+# Main script execution
+if [ $# -eq 0 ]; then
+    usage
+fi
 
-# Validate that all required files exist and are readable
 validate_files
 
-# Read hosts file and start the backup process
 while IFS= read -r line || [[ -n "$line" ]]; do
     IFS=' ' read -r ssh_conn src_dir <<< "$line"
     backup_host "$ssh_conn" "$src_dir"
