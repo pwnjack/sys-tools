@@ -21,6 +21,8 @@ usage() {
     exit 1
 }
 
+ALERT_EMAIL="admin@example.com"
+
 # Default variable settings
 HOSTS_FILE="hosts.txt"
 PASSPHRASE_FILE="passphrase.txt"
@@ -76,6 +78,13 @@ log_message() {
     local message=$2
     # Log messages are directed to file descriptor 3
     echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message" >&3
+}
+
+# Function to send an email alert
+send_email_alert() {
+    local subject=$1
+    local message=$2
+    echo "$message" | mail -s "$subject" "$ALERT_EMAIL"
 }
 
 # Function to validate file permissions
@@ -173,6 +182,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     IFS=' ' read -r ssh_conn src_dir <<< "$line"
     if ! backup_host "$ssh_conn" "$src_dir"; then
         log_message "ERROR" "Backup failed for $ssh_conn. See previous messages for details."
+        send_email_alert "Backup Failed" "Backup failed for $ssh_conn. Check the logs at $LOG_FILE for more information."
         ((error_count++))
     fi
 done < "$HOSTS_FILE"
