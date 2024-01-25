@@ -79,34 +79,41 @@ validate_files() {
     done
 }
 
-# Function to backup a single host
+# Function to backup a single host with retry logic
 backup_host() {
     local ssh_conn=$1
     local src_dir=$2
-    local host_name
-    host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
+    local retries=3
+    local delay=5
+    local success=0
 
-    if [[ $? -ne 0 ]]; then
-        log_message "ERROR" "SSH failed for $ssh_conn"
+    for ((i=0; i<retries; i++)); do
+        local host_name
+        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
+        if [[ $? -ne 0 ]]; then
+            log_message "ERROR" "SSH failed for $ssh_conn"
+        else
+            local backup_file="${BACKUP_DIR}/${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
+            local passphrase
+            passphrase=$(<"$PASSPHRASE_FILE")
+
+            if rsync --timeout=10 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" --rsync-path="sudo rsync" "$ssh_conn:$src_dir" "/tmp/${host_name}/" &&
+               tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
+                rm -rf "/tmp/${host_name}"
+                log_message "INFO" "Backup and cleanup completed for $host_name"
+                success=1
+                break
+            else
+                log_message "ERROR" "Backup failed for $ssh_conn, attempt $(($i + 1)) of $retries"
+            fi
+        fi
+        sleep $delay
+    done
+
+    if [[ $success -eq 0 ]]; then
+        log_message "ERROR" "Backup ultimately failed for $ssh_conn after $retries attempts."
         return 1
     fi
-
-    local backup_file="${BACKUP_DIR}/${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
-    local passphrase
-    passphrase=$(<"$PASSPHRASE_FILE")
-
-    if ! rsync --timeout=10 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" --rsync-path="sudo rsync" "$ssh_conn:$src_dir" "/tmp/${host_name}/"; then
-        log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
-        return 1
-    fi
-
-    if ! tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
-        log_message "ERROR" "Backup encryption failed for $host_name"
-        return 1
-    fi
-
-    rm -rf "/tmp/${host_name}"
-    log_message "INFO" "Backup and cleanup completed for $host_name"
 }
 
 # Main script execution
