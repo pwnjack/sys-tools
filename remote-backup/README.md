@@ -2,7 +2,7 @@
 
 ## Description
 
-This script is designed to perform automated backups of remote hosts using Rsync, and GPG encryption. It allows you to securely back up specified directories on multiple hosts and store the encrypted backups locally.
+This script is designed to perform automated incremental backups of remote hosts using Rsync, and GPG encryption. It allows you to securely back up specified directories on multiple hosts, store the encrypted backups locally, and maintain a local copy of the last backup state for efficient future backups.
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Before using this script, ensure you have the following:
 
 ## Usage
 
-    ./backup_script.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -l <log_file>
+    ./backup_script.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]
 
 ## Options
 
@@ -24,7 +24,9 @@ Before using this script, ensure you have the following:
     -k <ssh_key>: Path to the SSH key for connecting to the remote hosts.
     -e <exclude_file>: Path to the file containing the list of files to exclude from the backup.
     -b <backup_dir>: Path to the directory where the backups should be stored.
+    -t <temp_dir>: Path to the directory for storing temporary incremental backup data.
     -l <log_file>: Path to the file where logs should be written.
+    -s: Silent mode. Suppresses all output to stdout.
 
 ## Example files
 
@@ -41,11 +43,11 @@ Example of `exclude.txt` file:
 
 ## Example Usage
 
-    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/ssh_key -e exclude.txt -b backups -l backup.log
+    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/ssh_key -e exclude.txt -b backups -t /var/tmp/backups_temp -l backup.log
 
 ## Execution
 
-If you don't specify any options, the script will just display the usage. But if you provide at least one option, it will execute using default settings for any that weren't specified. It will then process the provided options, checking that all required files exist and are readable. Next, it will retrieve the passphrase from the file. Finally, it will start the backup process for each host and directory listed in `hosts.txt`
+If you don't specify any options, the script will display the usage information. Providing at least one option will execute the script using default settings for any options that weren't specified. The script processes the provided options, checks that all required files exist and are readable, retrieves the passphrase from the file, and starts the backup process for each host and directory listed in `hosts.txt`.
 
 ## Default Variables
 
@@ -54,6 +56,7 @@ If you don't specify any options, the script will just display the usage. But if
     SSH_KEY: ~/.ssh/ssh_key
     EXCLUDE_FILE: exclude.txt
     BACKUP_DIR: backups
+    TEMP_DIR: /var/tmp/backups_temp (default location for incremental backups)
     LOG_FILE: backup.log
 
 ## Restoring a Backup
@@ -65,7 +68,7 @@ To restore a backup, copy the encrypted backup file to the remote host and run t
 ## Note
 
 Ensure the passphrase file `passphrase.txt` is kept secure and not shared with unauthorized users.
-Always store backups in a secure location.
+Always store backups in a secure location. The temporary directory for incremental backups should be secured and not accessible by unauthorized users.
 
 ## License
 
