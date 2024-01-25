@@ -89,7 +89,7 @@ backup_host() {
 
     for ((i=0; i<retries; i++)); do
         local host_name
-        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=30 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
+        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
         if [[ $? -ne 0 ]]; then
             log_message "ERROR" "SSH failed for $ssh_conn, attempt $(($i + 1)) of $retries"
             sleep $delay
@@ -100,7 +100,7 @@ backup_host() {
         local passphrase
         passphrase=$(<"$PASSPHRASE_FILE")
 
-        if rsync --timeout=30 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "/tmp/${host_name}/" &&
+        if rsync --timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "/tmp/${host_name}/" &&
            tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
             rm -rf "/tmp/${host_name}"
             log_message "INFO" "Backup and cleanup completed for $host_name"
