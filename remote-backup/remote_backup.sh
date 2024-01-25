@@ -2,7 +2,7 @@
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -l <log_file> [-s]"
+    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -l <log_file> [-s]" >&3
     echo
     echo "Options:"
     echo "-h <hosts_file>        Path to the file containing the list of hosts to backup."
@@ -12,7 +12,7 @@ usage() {
     echo "-b <backup_dir>        Path to the directory where the backups should be stored."
     echo "-l <log_file>          Path to the file where logs should be written."
     echo "-s                     Silent mode. Suppresses all output."
-    echo
+    echo >&3
     exit 1
 }
 
@@ -24,6 +24,9 @@ EXCLUDE_FILE="exclude.txt"
 BACKUP_DIR="backups"
 LOG_FILE="backup.log"
 SILENT_MODE=0
+
+# Setup file descriptor 3 to point to the console
+exec 3>&1
 
 # Parse options
 while getopts ":h:p:k:e:b:l:s" opt; do
@@ -39,20 +42,18 @@ while getopts ":h:p:k:e:b:l:s" opt; do
     esac
 done
 
-# Redirect output to log file if not in silent mode
+# Redirect output to log file and possibly to stdout
 if [ $SILENT_MODE -eq 0 ]; then
-    exec 3>&1 4>&2
-    trap 'exec 2>&4 1>&3' 0 1 2 3
-    exec 1>>"$LOG_FILE" 2>&1
+    exec 1> >(tee -a "$LOG_FILE") 2>&1
 else
-    exec 1>/dev/null 2>&1
+    exec 1>>"$LOG_FILE" 2>&1
 fi
 
 # Function to log messages
 log_message() {
     local message_type=$1
     local message=$2
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message" >&3
 }
 
 # Function to validate file permissions
