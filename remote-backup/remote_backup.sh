@@ -89,25 +89,27 @@ backup_host() {
 
     for ((i=0; i<retries; i++)); do
         local host_name
-        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
+        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=30 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
         if [[ $? -ne 0 ]]; then
-            log_message "ERROR" "SSH failed for $ssh_conn"
-        else
-            local backup_file="${BACKUP_DIR}/${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
-            local passphrase
-            passphrase=$(<"$PASSPHRASE_FILE")
-
-            if rsync --timeout=10 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" --rsync-path="sudo rsync" "$ssh_conn:$src_dir" "/tmp/${host_name}/" &&
-               tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
-                rm -rf "/tmp/${host_name}"
-                log_message "INFO" "Backup and cleanup completed for $host_name"
-                success=1
-                break
-            else
-                log_message "ERROR" "Backup failed for $ssh_conn, attempt $(($i + 1)) of $retries"
-            fi
+            log_message "ERROR" "SSH failed for $ssh_conn, attempt $(($i + 1)) of $retries"
+            sleep $delay
+            continue
         fi
-        sleep $delay
+
+        local backup_file="${BACKUP_DIR}/${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
+        local passphrase
+        passphrase=$(<"$PASSPHRASE_FILE")
+
+        if rsync --timeout=30 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "/tmp/${host_name}/" &&
+           tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
+            rm -rf "/tmp/${host_name}"
+            log_message "INFO" "Backup and cleanup completed for $host_name"
+            success=1
+            break
+        else
+            log_message "ERROR" "Backup failed for $ssh_conn, attempt $(($i + 1)) of $retries"
+            sleep $delay
+        fi
     done
 
     if [[ $success -eq 0 ]]; then
