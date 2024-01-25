@@ -96,18 +96,30 @@ backup_host() {
             continue
         fi
 
-        local backup_file="${BACKUP_DIR}/${host_name}_$(date +%Y-%m-%d_%H-%M-%S).tar.gz.gpg"
+        # Create a directory for incremental backups if it doesn't exist
+        local incremental_backup_dir="/tmp/${host_name}_incremental"
+        mkdir -p "$incremental_backup_dir"
+
+        # Perform rsync for incremental backup
+        if ! rsync --timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "$incremental_backup_dir"; then
+            log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
+            sleep $delay
+            continue
+        fi
+
+        # Create a timestamped backup file name
+        local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+        local backup_file="${BACKUP_DIR}/${host_name}_${timestamp}.tar.gz.gpg"
         local passphrase
         passphrase=$(<"$PASSPHRASE_FILE")
 
-        if rsync --timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "/tmp/${host_name}/" &&
-           tar -czf - -C "/tmp" "$host_name" | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
-            rm -rf "/tmp/${host_name}"
-            log_message "INFO" "Backup and cleanup completed for $host_name"
+        # Archive and encrypt the incremental backup directory
+        if tar -czf - -C "$incremental_backup_dir" . | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
+            log_message "INFO" "Backup and encryption completed for $host_name"
             success=1
             break
         else
-            log_message "ERROR" "Backup failed for $ssh_conn, attempt $(($i + 1)) of $retries"
+            log_message "ERROR" "Backup encryption failed for $host_name"
             sleep $delay
         fi
     done
