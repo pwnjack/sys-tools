@@ -84,7 +84,7 @@ backup_host() {
     local ssh_conn=$1
     local src_dir=$2
     local host_name
-    host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" hostname 2>/dev/null)
+    host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
 
     if [[ $? -ne 0 ]]; then
         log_message "ERROR" "SSH failed for $ssh_conn"
@@ -95,7 +95,7 @@ backup_host() {
     local passphrase
     passphrase=$(<"$PASSPHRASE_FILE")
 
-    if ! rsync --timeout=10 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "/tmp/${host_name}/"; then
+    if ! rsync --timeout=10 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no" --rsync-path="sudo rsync" "$ssh_conn:$src_dir" "/tmp/${host_name}/"; then
         log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
         return 1
     fi
@@ -116,9 +116,20 @@ fi
 
 validate_files
 
+error_count=0
+
 while IFS= read -r line || [[ -n "$line" ]]; do
     IFS=' ' read -r ssh_conn src_dir <<< "$line"
-    backup_host "$ssh_conn" "$src_dir"
+    if ! backup_host "$ssh_conn" "$src_dir"; then
+        log_message "ERROR" "Backup failed for $ssh_conn. See previous messages for details."
+        ((error_count++))
+        # Decide what action to take here: exit, continue, retry, etc.
+    fi
 done < "$HOSTS_FILE"
 
-log_message "INFO" "Backup script completed"
+if [ $error_count -gt 0 ]; then
+    log_message "ERROR" "Backup script completed with $error_count errors."
+    exit 1
+else
+    log_message "INFO" "Backup script completed successfully."
+fi
