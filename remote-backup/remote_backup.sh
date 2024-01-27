@@ -8,16 +8,15 @@ usage() {
     # Direct output to file descriptor 3 to ensure it's visible to the user
     echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]" >&3
     echo
-    echo "Options:"
-    echo "-h <hosts_file>        Path to the file containing the list of hosts to backup."
-    echo "-p <passphrase_file>   Path to the file containing the passphrase for encryption."
-    echo "-k <ssh_key>           Path to the SSH key for connecting to the remote hosts."
-    echo "-e <exclude_file>      Path to the file containing the list of files to exclude from the backup."
-    echo "-b <backup_dir>        Path to the directory where the backups should be stored."
-    echo "-t <temp_dir>          Path to the directory for storing temporary incremental backup data."
-    echo "-l <log_file>          Path to the file where logs should be written."
-    echo "-s                     Silent mode. Suppresses all output."
-    echo >&3
+    echo "Options:" >&3
+    echo "-h <hosts_file>        Path to the file containing the list of hosts to backup." >&3
+    echo "-p <passphrase_file>   Path to the file containing the passphrase for encryption." >&3
+    echo "-k <ssh_key>           Path to the SSH key for connecting to the remote hosts." >&3
+    echo "-e <exclude_file>      Path to the file containing the list of files to exclude from the backup." >&3
+    echo "-b <backup_dir>        Path to the directory where the backups should be stored." >&3
+    echo "-t <temp_dir>          Path to the directory for storing temporary incremental backup data." >&3
+    echo "-l <log_file>          Path to the file where logs should be written." >&3
+    echo "-s                     Silent mode. Suppresses all output." >&3
     exit 1
 }
 
@@ -49,17 +48,31 @@ while getopts ":h:p:k:e:b:t:l:s" opt; do
     esac
 done
 
+# If no options were provided, display usage and exit
+if [ $# -eq 0 ]; then
+    usage
+fi
+
 # Validate and create TEMP_DIR if it does not exist
 if [[ ! -d "$TEMP_DIR" ]]; then
     mkdir -p "$TEMP_DIR"
     if [[ $? -ne 0 ]]; then
-        echo "Error: Unable to create temporary directory $TEMP_DIR." >&2
+        log_message "ERROR" "Unable to create temporary directory $TEMP_DIR."
         exit 1
     fi
 fi
 
 # Set permissions for TEMP_DIR to ensure it is secure
 chmod 700 "$TEMP_DIR"
+
+# Validate and create BACKUP_DIR if it does not exist
+if [[ ! -d "$BACKUP_DIR" ]]; then
+    mkdir -p "$BACKUP_DIR"
+    if [[ $? -ne 0 ]]; then
+        log_message "ERROR" "Unable to create backup directory $BACKUP_DIR."
+        exit 1
+    fi
+fi
 
 # Redirect output to log file and possibly to stdout
 if [ $SILENT_MODE -eq 0 ]; then
@@ -156,11 +169,6 @@ backup_host() {
         return 1
     fi
 }
-
-# Main script execution starts here
-if [ $# -eq 0 ]; then
-    usage
-fi
 
 # Validate the existence and permissions of required files
 validate_files
