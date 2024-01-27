@@ -184,3 +184,5 @@ if [ $error_count -gt 0 ]; then
 else
     log_message "INFO" "Backup script completed successfully."
 fi
+
+exit 0
