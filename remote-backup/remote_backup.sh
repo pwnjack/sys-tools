@@ -115,7 +115,7 @@ PASSPHRASE_FILE="passphrase.txt"
 SSH_KEY="$HOME/.ssh/id_rsa"
 EXCLUDE_FILE="exclude.txt"
 BACKUP_DIR="backups"
-TEMP_DIR="./tmp"
+TEMP_DIR="tmp"
 LOG_FILE="backup.log"
 SILENT_MODE=0
 

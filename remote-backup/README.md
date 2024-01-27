@@ -43,7 +43,7 @@ Example of `exclude.txt` file:
 
 ## Example Usage
 
-    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/ssh_key -e exclude.txt -b backups -t /var/tmp/backups_temp -l backup.log
+    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/ssh_key -e exclude.txt -b backups -t tmp -l backup.log
 
 ## Execution
 
@@ -53,10 +53,10 @@ If you don't specify any options, the script will display the usage information.
 
     HOSTS_FILE: hosts.txt
     PASSPHRASE_FILE: passphrase.txt
-    SSH_KEY: ~/.ssh/ssh_key
+    SSH_KEY: ~/.ssh/id_rsa
     EXCLUDE_FILE: exclude.txt
     BACKUP_DIR: backups
-    TEMP_DIR: /var/tmp/backups_temp (default location for incremental backups)
+    TEMP_DIR: tmp
     LOG_FILE: backup.log
 
 ## Restoring a Backup
