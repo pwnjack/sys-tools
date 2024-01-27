@@ -46,20 +46,36 @@ validate_files() {
     done
 }
 
+# Function to handle SSH failures
+handle_ssh_failure() {
+    local remote_host=$1
+    local attempt=$2
+    local max_attempts=$3
+    log_message "ERROR" "SSH failed for $remote_host, attempt $attempt of $max_attempts"
+    sleep $delay
+}
+
+# Function to handle rsync failures
+handle_rsync_failure() {
+    local remote_host=$1
+    local source_directory=$2
+    log_message "ERROR" "rsync failed for $remote_host:$source_directory"
+    sleep $delay
+}
+
 # Function to backup a single host with retry logic
 backup_host() {
-    local ssh_conn=$1
-    local src_dir=$2
+    local remote_host=$1
+    local source_directory=$2
     local retries=3
     local delay=5
     local success=0
 
     for ((i=0; i<retries; i++)); do
         local host_name
-        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
+        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$remote_host" "sudo hostname" 2>/dev/null)
         if [[ $? -ne 0 ]]; then
-            log_message "ERROR" "SSH failed for $ssh_conn, attempt $(($i + 1)) of $retries"
-            sleep $delay
+            handle_ssh_failure "$remote_host" "$(($i + 1))" "$retries"
             continue
         fi
 
@@ -67,9 +83,8 @@ backup_host() {
         mkdir -p "$incremental_backup_dir"
         chmod 700 "$incremental_backup_dir"
 
-        if ! rsync --timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" --rsync-path="sudo rsync" "$ssh_conn:$src_dir" "$incremental_backup_dir"; then
-            log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
-            sleep $delay
+        if ! rsync --timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" --rsync-path="sudo rsync" "$remote_host:$source_directory" "$incremental_backup_dir"; then
+            handle_rsync_failure "$remote_host" "$source_directory"
             continue
         fi
 
@@ -83,13 +98,13 @@ backup_host() {
             success=1
             break
         else
-                       log_message "ERROR" "Backup encryption failed for $host_name"
+            log_message "ERROR" "Backup encryption failed for $host_name"
             sleep $delay
         fi
     done
 
     if [[ $success -eq 0 ]]; then
-        log_message "ERROR" "Backup ultimately failed for $ssh_conn after $retries attempts."
+        log_message "ERROR" "Backup ultimately failed for $remote_host after $retries attempts."
         return 1
     fi
 }
@@ -163,9 +178,9 @@ error_count=0
 
 # Read each line from the hosts file and perform a backup
 while IFS= read -r line || [[ -n "$line" ]]; do
-    IFS=' ' read -r ssh_conn src_dir <<< "$line"
-    if ! backup_host "$ssh_conn" "$src_dir"; then
-        log_message "ERROR" "Backup failed for $ssh_conn. See previous messages for details."
+    IFS=' ' read -r remote_host source_directory <<< "$line"
+    if ! backup_host "$remote_host" "$source_directory"; then
+        log_message "ERROR" "Backup failed for $remote_host. See previous messages for details."
         ((error_count++))
     fi
 done < "$HOSTS_FILE"
