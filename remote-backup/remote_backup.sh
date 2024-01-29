@@ -83,12 +83,12 @@ backup_host() {
         mkdir -p "$incremental_backup_dir"
         chmod 700 "$incremental_backup_dir"
 
-        local rsync_options="--timeout=60 -a --delete --exclude-from=\"$EXCLUDE_FILE\" -e \"ssh -i $SSH_KEY\" --rsync-path=\"sudo rsync\""
+        local rsync_options=(--timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" --rsync-path="sudo rsync")
         if [ $SILENT_MODE -eq 0 ]; then
-            rsync_options+=" --progress --stats"
+            rsync_options+=(--progress --stats)
         fi
 
-        if ! rsync $rsync_options "$remote_host:$source_directory" "$incremental_backup_dir"; then
+        if ! rsync "${rsync_options[@]}" "$remote_host:$source_directory" "$incremental_backup_dir"; then
             handle_rsync_failure "$remote_host" "$source_directory"
             continue
         fi
