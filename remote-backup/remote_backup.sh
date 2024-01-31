@@ -13,6 +13,7 @@ usage() {
     echo "-t <temp_dir>          Path to the directory for storing temporary incremental backup data." >&3
     echo "-l <log_file>          Path to the file where logs should be written." >&3
     echo "-s                     Silent mode. Suppresses all output." >&3
+    echo "-v                     Verbose mode. Outputs detailed information about the backup process." >&3
     exit 1
 }
 
@@ -84,7 +85,7 @@ backup_host() {
         chmod 700 "$incremental_backup_dir"
 
         local rsync_options=(--timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" --rsync-path="sudo rsync")
-        if [ $SILENT_MODE -eq 0 ]; then
+        if [ $VERBOSE_MODE -eq 1 ]; then
             rsync_options+=(--progress --stats)
         fi
 
@@ -123,6 +124,7 @@ BACKUP_DIR="backups"
 TEMP_DIR="tmp"
 LOG_FILE="backup.log"
 SILENT_MODE=0
+VERBOSE_MODE=0
 
 # Setup file descriptor 3 to point to the console for user-visible messages
 exec 3>&1
@@ -138,6 +140,7 @@ while getopts ":h:p:k:e:b:t:l:s" opt; do
         t) TEMP_DIR="$OPTARG" ;;
         l) LOG_FILE="$OPTARG" ;;
         s) SILENT_MODE=1 ;;
+        v) VERBOSE_MODE=1 ;;
         *) usage ;;
     esac
 done
