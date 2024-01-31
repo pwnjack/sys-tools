@@ -15,7 +15,7 @@ Before using this script, ensure you have the following:
 
 ## Usage
 
-    ./backup_script.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]
+    ./backup_script.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s] [-v]
 
 ## Options
 
@@ -27,6 +27,7 @@ Before using this script, ensure you have the following:
     -t <temp_dir>: Path to the directory for storing temporary incremental backup data.
     -l <log_file>: Path to the file where logs should be written.
     -s: Silent mode. Suppresses all output to stdout.
+    -v: Verbose mode. Outputs detailed information about the backup process.
 
 ## Example files
 
