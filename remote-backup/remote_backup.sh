@@ -41,7 +41,7 @@ log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message" >&3
 }
 
-# Function to send an email alert using sendmail
+# Function to send an email alert using msmtp
 send_email_alert() {
     local subject=$1
     local message=$2
@@ -50,8 +50,8 @@ send_email_alert() {
     local email_content
     email_content="Subject: $subject\nFrom: $EMAIL_SENDER\nTo: $ALERT_EMAIL\n\n$message"
 
-    # Send the email using sendmail
-    echo -e "$email_content" | sendmail -t
+    # Send the email using msmtp
+    echo -e "$email_content" | msmtp --host=$SMTP_SERVER --port=$SMTP_PORT --from=$EMAIL_SENDER --add-missing-date-header --add-missing-from-header -t
 }
 
 # Function to validate file permissions

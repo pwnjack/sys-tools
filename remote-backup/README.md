@@ -12,6 +12,7 @@ Before using this script, ensure you have the following:
 - SSH key for remote authentication
 - A passphrase for encryption
 - Rsync installed on the local system
+- MSMTP installed on the local system (to send e-mail alerts on backup failures)
 
 ## Usage
 
