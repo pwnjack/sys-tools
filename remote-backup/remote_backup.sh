@@ -1,35 +1,15 @@
 #!/bin/bash
 
-# This script performs incremental backups of remote hosts, encrypts the backup,
-# and maintains a local copy of the last backup state for efficient future backups.
-
-# Function to display usage information
-usage() {
-    # Direct output to file descriptor 3 to ensure it's visible to the user
-    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]" >&3
-    echo
-    echo "Options:"
-    echo "-h <hosts_file>        Path to the file containing the list of hosts to backup."
-    echo "-p <passphrase_file>   Path to the file containing the passphrase for encryption."
-    echo "-k <ssh_key>           Path to the SSH key for connecting to the remote hosts."
-    echo "-e <exclude_file>      Path to the file containing the list of files to exclude from the backup."
-    echo "-b <backup_dir>        Path to the directory where the backups should be stored."
-    echo "-t <temp_dir>          Path to the directory for storing temporary incremental backup data."
-    echo "-l <log_file>          Path to the file where logs should be written."
-    echo "-s                     Silent mode. Suppresses all output."
-    echo >&3
-    exit 1
-}
-
 # Default variable settings
 HOSTS_FILE="hosts.txt"
 PASSPHRASE_FILE="passphrase.txt"
 SSH_KEY="$HOME/.ssh/id_rsa"
 EXCLUDE_FILE="exclude.txt"
 BACKUP_DIR="backups"
-TEMP_DIR="/var/tmp"  # Default temporary directory for incremental backups
+TEMP_DIR="tmp"
 LOG_FILE="backup.log"
 SILENT_MODE=0
+VERBOSE_MODE=0
 
 # E-mail alert settings
 ALERT_EMAIL="admin@example.com"
@@ -37,66 +17,28 @@ EMAIL_SENDER="backup-script@example.com"
 SMTP_SERVER="smtp.example.com"
 SMTP_PORT="25"
 
-# Setup file descriptor 3 to point to the console for user-visible messages
-exec 3>&1
-
-# Parse command-line options
-while getopts ":h:p:k:e:b:t:l:s" opt; do
-    case $opt in
-        h) HOSTS_FILE="$OPTARG" ;;
-        p) PASSPHRASE_FILE="$OPTARG" ;;
-        k) SSH_KEY="$OPTARG" ;;
-        e) EXCLUDE_FILE="$OPTARG" ;;
-        b) BACKUP_DIR="$OPTARG" ;;
-        t) TEMP_DIR="$OPTARG" ;;  # Assign user-specified temporary directory
-        l) LOG_FILE="$OPTARG" ;;
-        s) SILENT_MODE=1 ;;
-        *) usage ;;
-    esac
-done
-
-# Validate and create TEMP_DIR if it does not exist
-if [[ ! -d "$TEMP_DIR" ]]; then
-    mkdir -p "$TEMP_DIR"
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Unable to create temporary directory $TEMP_DIR." >&2
-        exit 1
-    fi
-fi
-
-# Set permissions for TEMP_DIR to ensure it is secure
-chmod 700 "$TEMP_DIR"
-
-# Redirect output to log file and possibly to stdout
-if [ $SILENT_MODE -eq 0 ]; then
-    # Output to both stdout and log file
-    exec 1> >(tee -a "$LOG_FILE") 2>&1
-else
-    # Output only to log file
-    exec 1>>"$LOG_FILE" 2>&1
-fi
+# Function to display usage information
+usage() {
+    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]" >&3
+    echo
+    echo "Options:" >&3
+    echo "-h <hosts_file>        Path to the file containing the list of hosts to backup." >&3
+    echo "-p <passphrase_file>   Path to the file containing the passphrase for encryption." >&3
+    echo "-k <ssh_key>           Path to the SSH key for connecting to the remote hosts." >&3
+    echo "-e <exclude_file>      Path to the file containing the list of files to exclude from the backup." >&3
+    echo "-b <backup_dir>        Path to the directory where the backups should be stored." >&3
+    echo "-t <temp_dir>          Path to the directory for storing temporary incremental backup data." >&3
+    echo "-l <log_file>          Path to the file where logs should be written." >&3
+    echo "-s                     Silent mode. Suppresses all output." >&3
+    echo "-v                     Verbose mode. Outputs detailed information about the backup process." >&3
+    exit 1
+}
 
 # Function to log messages with a timestamp
 log_message() {
     local message_type=$1
     local message=$2
-    # Log messages are directed to file descriptor 3
     echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message" >&3
-}
-
-# Function to send an email alert
-send_email_alert() {
-    local subject=$1
-    local message=$2
-
-    # Create the email headers
-    local headers="From: $EMAIL_SENDER\nTo: $ALERT_EMAIL\nSubject: $subject\n"
-
-    # Send the email
-    {
-        echo -e "$headers"
-        echo -e "$message"
-    } | sendmail -t -S "$SMTP_SERVER":$SMTP_PORT
 }
 
 # Function to validate file permissions
@@ -104,7 +46,6 @@ validate_permissions() {
     local file=$1
     local permissions
     permissions=$(stat -c "%a" "$file")
-    # Ensure permissions are not too open
     if [ "$permissions" -gt "600" ]; then
         log_message "ERROR" "Permissions for $file are too open. It is recommended to use 'chmod 600 $file' to set proper permissions."
         exit 1
@@ -123,44 +64,58 @@ validate_files() {
     done
 }
 
+# Function to handle SSH failures
+handle_ssh_failure() {
+    local remote_host=$1
+    local attempt=$2
+    local max_attempts=$3
+    log_message "ERROR" "SSH failed for $remote_host, attempt $attempt of $max_attempts"
+    sleep $delay
+}
+
+# Function to handle rsync failures
+handle_rsync_failure() {
+    local remote_host=$1
+    local source_directory=$2
+    log_message "ERROR" "rsync failed for $remote_host:$source_directory"
+    sleep $delay
+}
+
 # Function to backup a single host with retry logic
 backup_host() {
-    local ssh_conn=$1
-    local src_dir=$2
+    local remote_host=$1
+    local source_directory=$2
     local retries=3
     local delay=5
     local success=0
 
-    # Attempt to backup the host with the specified number of retries
     for ((i=0; i<retries; i++)); do
-        # Fetch the hostname for identification purposes
         local host_name
-        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$ssh_conn" "sudo hostname" 2>/dev/null)
+        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$remote_host" "sudo hostname" 2>/dev/null)
         if [[ $? -ne 0 ]]; then
-            log_message "ERROR" "SSH failed for $ssh_conn, attempt $(($i + 1)) of $retries"
-            sleep $delay
+            handle_ssh_failure "$remote_host" "$(($i + 1))" "$retries"
             continue
         fi
 
-        # Create a directory for incremental backups if it doesn't exist
-        local incremental_backup_dir="${TEMP_DIR}/${host_name}_incremental"
+        local incremental_backup_dir="${TEMP_DIR}/${host_name}"
         mkdir -p "$incremental_backup_dir"
-        chmod 700 "$incremental_backup_dir"  # Secure the directory
+        chmod 700 "$incremental_backup_dir"
 
-        # Perform rsync for incremental backup
-        if ! rsync --timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" "$ssh_conn:$src_dir" "$incremental_backup_dir"; then
-            log_message "ERROR" "rsync failed for $ssh_conn:$src_dir"
-            sleep $delay
+        local rsync_options=(--timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" --rsync-path="sudo rsync")
+        if [ $VERBOSE_MODE -eq 1 ]; then
+            rsync_options+=(--progress --stats)
+        fi
+
+        if ! rsync "${rsync_options[@]}" "$remote_host:$source_directory" "$incremental_backup_dir"; then
+            handle_rsync_failure "$remote_host" "$source_directory"
             continue
         fi
 
-        # Create a timestamped backup file name
         local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
         local backup_file="${BACKUP_DIR}/${host_name}_${timestamp}.tar.gz.gpg"
         local passphrase
         passphrase=$(<"$PASSPHRASE_FILE")
 
-        # Archive and encrypt the incremental backup directory
         if tar -czf - -C "$incremental_backup_dir" . | gpg --batch --yes --symmetric --passphrase "$passphrase" -o "$backup_file"; then
             log_message "INFO" "Backup and encryption completed for $host_name"
             success=1
@@ -171,16 +126,62 @@ backup_host() {
         fi
     done
 
-    # Check if the backup was successful after all retries
     if [[ $success -eq 0 ]]; then
-        log_message "ERROR" "Backup ultimately failed for $ssh_conn after $retries attempts."
+        log_message "ERROR" "Backup ultimately failed for $remote_host after $retries attempts."
         return 1
     fi
 }
 
-# Main script execution starts here
+# Setup file descriptor 3 to point to the console for user-visible messages
+exec 3>&1
+
+# Parse command-line options
+while getopts ":h:p:k:e:b:t:l:s" opt; do
+    case $opt in
+        h) HOSTS_FILE="$OPTARG" ;;
+        p) PASSPHRASE_FILE="$OPTARG" ;;
+        k) SSH_KEY="$OPTARG" ;;
+        e) EXCLUDE_FILE="$OPTARG" ;;
+        b) BACKUP_DIR="$OPTARG" ;;
+        t) TEMP_DIR="$OPTARG" ;;
+        l) LOG_FILE="$OPTARG" ;;
+        s) SILENT_MODE=1 ;;
+        v) VERBOSE_MODE=1 ;;
+        *) usage ;;
+    esac
+done
+
+# If no options were provided, display usage and exit
 if [ $# -eq 0 ]; then
     usage
+fi
+
+# Validate and create TEMP_DIR if it does not exist
+if [[ ! -d "$TEMP_DIR" ]]; then
+    mkdir -p "$TEMP_DIR"
+    if [[ $? -ne 0 ]]; then
+        log_message "ERROR" "Unable to create temporary directory $TEMP_DIR."
+        exit 1
+    fi
+fi
+
+# Set permissions for TEMP_DIR to ensure it is secure
+chmod 700 "$TEMP_DIR"
+
+# Validate and create BACKUP_DIR if it does not exist
+if [[ ! -d "$BACKUP_DIR" ]]; then
+    mkdir -p "$BACKUP_DIR"
+    if [[ $? -ne 0 ]]; then
+        log_message "ERROR" "Unable to create backup directory $BACKUP_DIR."
+        exit 1
+    fi
+fi
+
+# Redirect output to log file and possibly to stdout
+if [ $SILENT_MODE -eq 0 ]; then
+    exec 1> >(tee -a "$LOG_FILE") 2>&1
+else
+    exec 1>>"$LOG_FILE" 2>&1
 fi
 
 # Validate the existence and permissions of required files
@@ -191,11 +192,11 @@ error_count=0
 
 # Read each line from the hosts file and perform a backup
 while IFS= read -r line || [[ -n "$line" ]]; do
-    IFS=' ' read -r ssh_conn src_dir <<< "$line"
-    if ! backup_host "$ssh_conn" "$src_dir"; then
-        log_message "ERROR" "Backup failed for $ssh_conn. See previous messages for details."
-        send_email_alert "Backup Failed" "Backup failed for $ssh_conn. Check the logs at $LOG_FILE for more information."
+    IFS=' ' read -r remote_host source_directory <<< "$line"
+    if ! backup_host "$remote_host" "$source_directory"; then
+        log_message "ERROR" "Backup failed for $remote_host. See previous messages for details."
         ((error_count++))
+        send_email_alert "Backup Failed" "Backup failed for $ssh_conn. Check the logs at $LOG_FILE for more information."
     fi
 done < "$HOSTS_FILE"
 
@@ -206,3 +207,5 @@ if [ $error_count -gt 0 ]; then
 else
     log_message "INFO" "Backup script completed successfully."
 fi
+
+exit 0
