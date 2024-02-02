@@ -21,8 +21,6 @@ usage() {
     exit 1
 }
 
-ALERT_EMAIL="admin@example.com"
-
 # Default variable settings
 HOSTS_FILE="hosts.txt"
 PASSPHRASE_FILE="passphrase.txt"
@@ -32,6 +30,12 @@ BACKUP_DIR="backups"
 TEMP_DIR="/var/tmp"  # Default temporary directory for incremental backups
 LOG_FILE="backup.log"
 SILENT_MODE=0
+
+# E-mail alerts settings
+ALERT_EMAIL="admin@example.com"
+EMAIL_SENDER=backup-script@example.com
+SMTP_SERVER="smtp.example.com"
+SMTP_PORT=25
 
 # Setup file descriptor 3 to point to the console for user-visible messages
 exec 3>&1
@@ -84,7 +88,15 @@ log_message() {
 send_email_alert() {
     local subject=$1
     local message=$2
-    echo "$message" | mail -s "$subject" "$ALERT_EMAIL"
+
+    # Create the email headers
+    local headers="From: $EMAIL_SENDER\nTo: $ALERT_EMAIL\nSubject: $subject\n"
+
+    # Send the email
+    {
+        echo -e "$headers"
+        echo -e "$message"
+    } | sendmail -t -S "$SMTP_SERVER":$SMTP_PORT
 }
 
 # Function to validate file permissions
