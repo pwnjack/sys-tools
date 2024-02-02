@@ -1,5 +1,22 @@
 #!/bin/bash
 
+# Default variable settings
+HOSTS_FILE="hosts.txt"
+PASSPHRASE_FILE="passphrase.txt"
+SSH_KEY="$HOME/.ssh/id_rsa"
+EXCLUDE_FILE="exclude.txt"
+BACKUP_DIR="backups"
+TEMP_DIR="tmp"
+LOG_FILE="backup.log"
+SILENT_MODE=0
+VERBOSE_MODE=0
+
+# E-mail alert settings
+ALERT_EMAIL="admin@example.com"
+EMAIL_SENDER="backup-script@example.com"
+SMTP_SERVER="smtp.example.com"
+SMTP_PORT="25"
+
 # Function to display usage information
 usage() {
     echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]" >&3
@@ -22,6 +39,21 @@ log_message() {
     local message_type=$1
     local message=$2
     echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message" >&3
+}
+
+# Function to send an email alert
+send_email_alert() {
+    local subject=$1
+    local message=$2
+
+    # Create the email headers
+    local headers="From: $EMAIL_SENDER\nTo: $ALERT_EMAIL\nSubject: $subject\n"
+
+    # Send the email
+    {
+        echo -e "$headers"
+        echo -e "$message"
+    } | sendmail -t -S "$SMTP_SERVER":$SMTP_PORT
 }
 
 # Function to validate file permissions
@@ -115,17 +147,6 @@ backup_host() {
     fi
 }
 
-# Default variable settings
-HOSTS_FILE="hosts.txt"
-PASSPHRASE_FILE="passphrase.txt"
-SSH_KEY="$HOME/.ssh/id_rsa"
-EXCLUDE_FILE="exclude.txt"
-BACKUP_DIR="backups"
-TEMP_DIR="tmp"
-LOG_FILE="backup.log"
-SILENT_MODE=0
-VERBOSE_MODE=0
-
 # Setup file descriptor 3 to point to the console for user-visible messages
 exec 3>&1
 
@@ -190,6 +211,9 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     if ! backup_host "$remote_host" "$source_directory"; then
         log_message "ERROR" "Backup failed for $remote_host. See previous messages for details."
         ((error_count++))
+        if ! send_email_alert "Backup Failed" "Backup failed for $remote_host. Check the logs at $LOG_FILE for more information."; then
+            log_message "ERROR" "Failed to send email alert for $remote_host."
+        fi
     fi
 done < "$HOSTS_FILE"
 
