@@ -104,8 +104,7 @@ backup_host() {
 
     for ((i=0; i<retries; i++)); do
         local host_name
-        host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$remote_host" "sudo hostname" 2>/dev/null)
-        if [[ $? -ne 0 ]]; then
+        if ! host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$remote_host" "sudo hostname" 2>/dev/null); then
             handle_ssh_failure "$remote_host" "$(($i + 1))" "$retries"
             continue
         fi
@@ -124,7 +123,8 @@ backup_host() {
             continue
         fi
 
-        local timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+        local timestamp
+        timestamp=$(date +%Y-%m-%d_%H-%M-%S)
         local backup_file="${BACKUP_DIR}/${host_name}_${timestamp}.tar.gz.gpg"
         local passphrase
         passphrase=$(<"$PASSPHRASE_FILE")
@@ -171,8 +171,7 @@ fi
 
 # Validate and create TEMP_DIR if it does not exist
 if [[ ! -d "$TEMP_DIR" ]]; then
-    mkdir -p "$TEMP_DIR"
-    if [[ $? -ne 0 ]]; then
+    if ! mkdir -p "$TEMP_DIR"; then
         log_message "ERROR" "Unable to create temporary directory $TEMP_DIR."
         exit 1
     fi
@@ -182,8 +181,7 @@ fi
 
 # Validate and create BACKUP_DIR if it does not exist
 if [[ ! -d "$BACKUP_DIR" ]]; then
-    mkdir -p "$BACKUP_DIR"
-    if [[ $? -ne 0 ]]; then
+    if ! mkdir -p "$BACKUP_DIR"; then
         log_message "ERROR" "Unable to create backup directory $BACKUP_DIR."
         exit 1
     fi
