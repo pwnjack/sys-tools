@@ -176,10 +176,9 @@ if [[ ! -d "$TEMP_DIR" ]]; then
         log_message "ERROR" "Unable to create temporary directory $TEMP_DIR."
         exit 1
     fi
+    # Set permissions for TEMP_DIR to ensure it is secure
+    chmod 700 "$TEMP_DIR"
 fi
-
-# Set permissions for TEMP_DIR to ensure it is secure
-chmod 700 "$TEMP_DIR"
 
 # Validate and create BACKUP_DIR if it does not exist
 if [[ ! -d "$BACKUP_DIR" ]]; then
@@ -209,6 +208,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     if ! backup_host "$remote_host" "$source_directory"; then
         log_message "ERROR" "Backup failed for $remote_host. See previous messages for details."
         ((error_count++))
+        # Send an email alert due to backup failure
         if ! send_email_alert "Backup Failed" "Backup failed for $remote_host. Check the logs at $LOG_FILE for more information."; then
             log_message "ERROR" "Failed to send email alert for $remote_host."
         fi
