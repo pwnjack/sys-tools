@@ -149,7 +149,7 @@ backup_host() {
 exec 3>&1
 
 # Parse command-line options
-while getopts ":h:p:k:e:b:t:l:s" opt; do
+while getopts ":h:p:k:e:b:t:l:sv" opt; do
     case $opt in
         h) HOSTS_FILE="$OPTARG" ;;
         p) PASSPHRASE_FILE="$OPTARG" ;;
