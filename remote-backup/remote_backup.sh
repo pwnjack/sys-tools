@@ -31,11 +31,11 @@ TEMP_DIR="/var/tmp"  # Default temporary directory for incremental backups
 LOG_FILE="backup.log"
 SILENT_MODE=0
 
-# E-mail alerts settings
+# E-mail alert settings
 ALERT_EMAIL="admin@example.com"
-EMAIL_SENDER=backup-script@example.com
+EMAIL_SENDER="backup-script@example.com"
 SMTP_SERVER="smtp.example.com"
-SMTP_PORT=25
+SMTP_PORT="25"
 
 # Setup file descriptor 3 to point to the console for user-visible messages
 exec 3>&1
