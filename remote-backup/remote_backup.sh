@@ -41,19 +41,17 @@ log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [$message_type]: $message" >&3
 }
 
-# Function to send an email alert
+# Function to send an email alert using sendmail
 send_email_alert() {
     local subject=$1
     local message=$2
 
-    # Create the email headers
-    local headers="From: $EMAIL_SENDER\nTo: $ALERT_EMAIL\nSubject: $subject\n"
+    # Create the email headers and message
+    local email_content
+    email_content="Subject: $subject\nFrom: $EMAIL_SENDER\nTo: $ALERT_EMAIL\n\n$message"
 
-    # Send the email
-    {
-        echo -e "$headers"
-        echo -e "$message"
-    } | sendmail -t -S "$SMTP_SERVER":$SMTP_PORT
+    # Send the email using sendmail
+    echo -e "$email_content" | sendmail -t
 }
 
 # Function to validate file permissions
