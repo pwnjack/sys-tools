@@ -105,7 +105,7 @@ backup_host() {
     for ((i=0; i<retries; i++)); do
         local host_name
         if ! host_name=$(ssh -i "$SSH_KEY" -o ConnectTimeout=10 -n "$remote_host" "sudo hostname" 2>/dev/null); then
-            handle_ssh_failure "$remote_host" "$(($i + 1))" "$retries"
+            handle_ssh_failure "$remote_host" "$((i + 1))" "$retries"
             continue
         fi
 
