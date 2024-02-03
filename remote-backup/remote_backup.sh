@@ -39,7 +39,7 @@ send_email_alert() {
     email_content="Subject: $subject\nFrom: $EMAIL_SENDER\nTo: $ALERT_EMAIL\n\n$message"
 
     # Send the email using msmtp
-echo -e "$email_content" | msmtp --host="$SMTP_SERVER" --port="$SMTP_PORT" --from="$EMAIL_SENDER" --add-missing-date-header --add-missing-from-header -t
+    echo -e "$email_content" | msmtp --host="$SMTP_SERVER" --port="$SMTP_PORT" --from="$EMAIL_SENDER" --add-missing-date-header --add-missing-from-header -t
 }
 
 # Function to validate file permissions
