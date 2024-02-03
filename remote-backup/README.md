@@ -75,4 +75,5 @@ Always store backups in a secure location. The temporary directory for increment
 ## License and Authorship
 
 Author: @pwnjack
+
 This script is provided under the MIT License.
