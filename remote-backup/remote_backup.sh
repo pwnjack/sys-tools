@@ -1,21 +1,9 @@
 #!/bin/bash
 
-# Default variable settings
-HOSTS_FILE="hosts.txt"
-PASSPHRASE_FILE="passphrase.txt"
-SSH_KEY="$HOME/.ssh/id_rsa"
-EXCLUDE_FILE="exclude.txt"
-BACKUP_DIR="backups"
-TEMP_DIR="tmp"
-LOG_FILE="backup.log"
-SILENT_MODE=0
-VERBOSE_MODE=0
+# Author: @pwnjack
 
-# E-mail alert settings
-ALERT_EMAIL="admin@example.com"
-EMAIL_SENDER="backup-script@example.com"
-SMTP_SERVER="smtp.example.com"
-SMTP_PORT="25"
+# Source configuration file
+source backup.conf
 
 # Function to display usage information
 usage() {

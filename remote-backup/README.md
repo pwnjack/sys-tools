@@ -45,7 +45,7 @@ Example of `exclude.txt` file:
 
 ## Example Usage
 
-    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/ssh_key -e exclude.txt -b backups -t tmp -l backup.log
+    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/id_rsa -e exclude.txt -b backups -t tmp -l backup.log
 
 ## Execution
 
@@ -72,6 +72,7 @@ To restore a backup, copy the encrypted backup file to the remote host and run t
 Ensure the passphrase file `passphrase.txt` is kept secure and not shared with unauthorized users.
 Always store backups in a secure location. The temporary directory for incremental backups should be secured and not accessible by unauthorized users.
 
-## License
+## License and Authorship
 
+Author: @pwnjack
 This script is provided under the MIT License.
