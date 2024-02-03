@@ -39,7 +39,7 @@ send_email_alert() {
     email_content="Subject: $subject\nFrom: $EMAIL_SENDER\nTo: $ALERT_EMAIL\n\n$message"
 
     # Send the email using msmtp
-    echo -e "$email_content" | msmtp --host=$SMTP_SERVER --port=$SMTP_PORT --from=$EMAIL_SENDER --add-missing-date-header --add-missing-from-header -t
+echo -e "$email_content" | msmtp --host="$SMTP_SERVER" --port="$SMTP_PORT" --from="$EMAIL_SENDER" --add-missing-date-header --add-missing-from-header -t
 }
 
 # Function to validate file permissions
@@ -55,7 +55,7 @@ validate_permissions() {
 
 # Function to validate that all required files exist and are readable
 validate_files() {
-    local files=("$HOSTS_FILE" "$EXCLUDE_FILE" "$SSH_KEY" "$PASSPHRASE_FILE")
+    local files=("$HOSTS_FILE" "$EXCLUDE_FILE" "$SSH_KEY" "$PASSPHRASE_FILE" "backup.conf")
     for file in "${files[@]}"; do
         if [[ ! -r $file ]]; then
             log_message "ERROR" "Error: '$file' does not exist or is not readable."
@@ -101,8 +101,8 @@ backup_host() {
         mkdir -p "$incremental_backup_dir"
         chmod 700 "$incremental_backup_dir"
 
-        local rsync_options=(--timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i $SSH_KEY" --rsync-path="sudo rsync")
-        if [ $VERBOSE_MODE -eq 1 ]; then
+        local rsync_options=(--timeout=60 -a --delete --exclude-from="$EXCLUDE_FILE" -e "ssh -i \"$SSH_KEY\"" --rsync-path="sudo rsync")
+        if [ "$VERBOSE_MODE" -eq 1 ]; then
             rsync_options+=(--progress --stats)
         fi
 
@@ -176,7 +176,7 @@ if [[ ! -d "$BACKUP_DIR" ]]; then
 fi
 
 # Redirect output to log file and possibly to stdout
-if [ $SILENT_MODE -eq 0 ]; then
+if [ "$SILENT_MODE" -eq 0 ]; then
     exec 1> >(tee -a "$LOG_FILE") 2>&1
 else
     exec 1>>"$LOG_FILE" 2>&1
