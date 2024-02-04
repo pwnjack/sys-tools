@@ -204,11 +204,11 @@ done < "$HOSTS_FILE"
 # Final log message indicating the completion status of the script
 if [ "$error_count" -gt 0 ]; then
     log_message "ERROR" "Backup script completed with $error_count errors."
-    send_email_alert "Backup Completed with Errors" "Backup script completed with $error_count errors. Check the logs at \"$LOG_FILE\" for more information."
+    send_email_alert "Backup Completed with Errors" "Backup script completed with $error_count errors. Check the logs at $LOG_FILE for more information."
     exit 1
 else
     log_message "INFO" "Backup script completed successfully."
-    send_email_alert "Backup Completed Successfully" "Backup script completed successfully. Check the logs at \"$LOG_FILE\" for more information."
+    send_email_alert "Backup Completed Successfully" "Backup script completed successfully. Check the logs at $LOG_FILE for more information."
 fi
 
 exit 0
