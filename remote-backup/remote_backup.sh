@@ -38,8 +38,12 @@ send_email_alert() {
     local email_content
     email_content="Subject: $subject\nFrom: $EMAIL_SENDER\nTo: $ALERT_EMAIL\n\n$message"
 
-    # Send the email using msmtp
-    echo -e "$email_content" | msmtp --host="$SMTP_SERVER" --port="$SMTP_PORT" --from="$EMAIL_SENDER" --add-missing-date-header --add-missing-from-header -t
+    # Send the email using msmtp with a 10-second timeout
+    if ! echo -e "$email_content" | msmtp --host="$SMTP_SERVER" --port="$SMTP_PORT" --timeout=10 --from="$EMAIL_SENDER" --add-missing-date-header --add-missing-from-header -t; then
+        log_message "ERROR" "Failed to send email alert for $subject."
+        return 1
+    fi
+    return 0
 }
 
 # Function to validate file permissions
