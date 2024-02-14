@@ -7,7 +7,7 @@ source backup.conf
 
 # Function to display usage information
 usage() {
-    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s]" >&3
+    echo "Usage: $0 -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s] [-v]" >&3
     echo
     echo "Options:" >&3
     echo "-h <hosts_file>        Path to the file containing the list of hosts to backup." >&3
