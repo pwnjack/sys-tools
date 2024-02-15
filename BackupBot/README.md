@@ -16,7 +16,7 @@ Before using this script, ensure you have the following:
 
 ## Usage
 
-    ./remote_backup.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s] [-v]
+    ./backupbot.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s] [-v]
 
 ## Options
 
@@ -45,7 +45,7 @@ Example of `exclude.txt` file:
 
 ## Example Usage
 
-    ./remote_backup.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/id_rsa -e exclude.txt -b backups -t tmp -l backup.log
+    ./backupbot.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/id_rsa -e exclude.txt -b backups -t tmp -l backup.log
 
 ## Execution
 
