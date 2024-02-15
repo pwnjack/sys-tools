@@ -2,7 +2,7 @@
 
 ## Description
 
-This script is designed to perform automated incremental backups of remote hosts using Rsync, and GPG encryption. It allows you to securely back up specified directories on multiple hosts, store the encrypted backups locally, and maintain a local copy of the last backup state for efficient future backups.
+This script is designed to perform automated backups of remote hosts using Rsync and GPG encryption. It allows you to securely back up specified directories on multiple hosts, store the encrypted backups locally, and maintain a local copy of the last backup state for efficient future backups.
 
 ## Prerequisites
 
@@ -16,7 +16,7 @@ Before using this script, ensure you have the following:
 
 ## Usage
 
-    ./backup_script.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s] [-v]
+    ./remote_backup.sh -h <hosts_file> -p <passphrase_file> -k <ssh_key> -e <exclude_file> -b <backup_dir> -t <temp_dir> -l <log_file> [-s] [-v]
 
 ## Options
 
@@ -45,13 +45,15 @@ Example of `exclude.txt` file:
 
 ## Example Usage
 
-    ./backup_script.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/id_rsa -e exclude.txt -b backups -t tmp -l backup.log
+    ./remote_backup.sh -h hosts.txt -p passphrase.txt -k ~/.ssh/id_rsa -e exclude.txt -b backups -t tmp -l backup.log
 
 ## Execution
 
-If you don't specify any options, the script will display the usage information. Providing at least one option will execute the script using default settings for any options that weren't specified. The script processes the provided options, checks that all required files exist and are readable, retrieves the passphrase from the file, and starts the backup process for each host and directory listed in `hosts.txt`.
+If you don't specify any options, the script will display the usage information. Providing at least one option will execute the script using the default settings for any options that weren't specified. The script processes the provided options, checks that all required files exist and are readable, retrieves the passphrase from the file, and starts the backup process for each host and directory listed in the `hosts.txt` file.
 
 ## Default Variables
+
+The script uses the following default variables, which can be overridden by command-line options:
 
     HOSTS_FILE: hosts.txt
     PASSPHRASE_FILE: passphrase.txt
@@ -60,6 +62,8 @@ If you don't specify any options, the script will display the usage information.
     BACKUP_DIR: backups
     TEMP_DIR: tmp
     LOG_FILE: backup.log
+
+These defaults are set in the `backup.conf` configuration file.
 
 ## Restoring a Backup
 
