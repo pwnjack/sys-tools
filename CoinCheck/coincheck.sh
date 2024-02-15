@@ -7,6 +7,13 @@ then
     exit 1
 fi
 
+# Check if an argument is provided
+if [ -z "$1" ]; then
+    echo "Please provide a currency symbol as an argument."
+    echo "Usage: ./coincheck.sh BTC"
+    exit 1
+fi
+
 # Convert the first argument to uppercase since Coinbase API expects currency symbols in uppercase
 CURRENCY=$(echo "$1" | tr '[:lower:]' '[:upper:]')
 
