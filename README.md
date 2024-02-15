@@ -10,7 +10,7 @@ SysTools is a no-nonsense collection of scripts for those who automate not becau
 
 ## Setup
 
-    git clone https://github.com/your-username/SysTools.git
+    git clone https://github.com/pwnjack/SysTools.git
     cd SysTools/<tool-name>
 
 Check the README.md there for the next steps.
