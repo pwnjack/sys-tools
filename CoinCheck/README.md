@@ -11,7 +11,7 @@ Get crypto prices with a simple bash command.
 1. Clone this repo or just grab the `coincheck.sh` script.
 2. Make it executable:
 
-    chmod +x coincheck.sh
+        chmod +x coincheck.sh
 
 ## Usage
 
