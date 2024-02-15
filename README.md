@@ -6,8 +6,8 @@ SysTools is a no-nonsense collection of scripts for those who automate not becau
 
 ## Contents
 
-- [BackupBot](./remote-backup/README.md) - Set it and forget it: automated backups with encryption.
-- [CoinCheck](./coincheck/README.md) - Crypto at a glance: Get the latest coin values with a lazy one-liner.
+- [BackupBot](./BackupBot/README.md) - Set it and forget it: automated backups with encryption.
+- [CoinCheck](./CoinCheck/README.md) - Crypto at a glance: Get the latest coin values with a lazy one-liner.
 
 ## Setup
 
