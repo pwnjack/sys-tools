@@ -25,9 +25,9 @@ fi
 # Parse the price from the response using jq
 PRICE=$(echo $RESPONSE | jq -r '.data.amount')
 
-# Check if the price is non-empty
-if [ -z "$PRICE" ]; then
-    echo "Could not find the price for $CURRENCY."
+# Check if the price is non-empty and not null
+if [ -z "$PRICE" ] || [ "$PRICE" == "null" ]; then
+    echo "Could not find the price for $CURRENCY. Please check if the currency symbol is correct."
     exit 1
 fi
 
