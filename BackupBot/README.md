@@ -1,4 +1,4 @@
-# Remote Backup Script
+# BackupBot
 
 ## Description
 
